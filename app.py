@@ -91,6 +91,25 @@ for region in REGIONS.values():
         for league in category['leagues'].values():
             LEAGUES[league['id']] = league['name']
 
+@app.template_filter('format_time')
+def format_time(date_str):
+    """Formate une date au format HH:MM"""
+    try:
+        if isinstance(date_str, str):
+            # Si c'est une chaîne ISO, on la parse
+            dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            return dt.strftime('%H:%M')
+        return ''
+    except Exception as e:
+        print(f"Erreur lors du formatage de la date {date_str}: {e}")
+        return ''
+
+# Gestionnaire d'erreurs global
+@app.errorhandler(Exception)
+def handle_error(e):
+    print(f"Erreur: {str(e)}")
+    return "Une erreur s'est produite. Veuillez réessayer plus tard.", 500
+
 def make_api_request(endpoint, params=""):
     conn = http.client.HTTPSConnection('api-football-v1.p.rapidapi.com')
     headers = {
@@ -647,10 +666,6 @@ def get_predictions():
             'def': {
                 'home': round(safe_int_convert(safe_get(prediction_data, 'comparison', 'def', 'home', default=50)), 2),
                 'away': round(safe_int_convert(safe_get(prediction_data, 'comparison', 'def', 'away', default=50)), 2)
-            },
-            'poisson_distribution': {
-                'home': round(safe_int_convert(safe_get(prediction_data, 'comparison', 'poisson_distribution', 'home', default=50)), 2),
-                'away': round(safe_int_convert(safe_get(prediction_data, 'comparison', 'poisson_distribution', 'away', default=50)), 2)
             }
         },
         'poisson': {
