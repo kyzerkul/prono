@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 import requests
 import os
 from dotenv import load_dotenv
+from functools import lru_cache
+import time
 
 load_dotenv()  # Charge les variables d'environnement depuis .env
 
@@ -91,6 +93,87 @@ for region in REGIONS.values():
         for league in category['leagues'].values():
             LEAGUES[league['id']] = league['name']
 
+# Cache pour les appels API (30 minutes)
+CACHE_DURATION = 1800
+
+class APICache:
+    def __init__(self):
+        self.cache = {}
+        
+    def get(self, key):
+        if key in self.cache:
+            data, timestamp = self.cache[key]
+            if time.time() - timestamp < CACHE_DURATION:
+                return data
+            else:
+                del self.cache[key]
+        return None
+        
+    def set(self, key, data):
+        self.cache[key] = (data, time.time())
+
+api_cache = APICache()
+
+def make_api_request(endpoint, params=""):
+    # Créer une clé de cache unique
+    cache_key = f"{endpoint}?{params}"
+    
+    # Vérifier le cache
+    cached_data = api_cache.get(cache_key)
+    if cached_data:
+        return cached_data
+    
+    # Si pas en cache, faire l'appel API
+    conn = http.client.HTTPSConnection('api-football-v1.p.rapidapi.com')
+    headers = {
+        'x-rapidapi-key': API_KEY,
+        'x-rapidapi-host': 'api-football-v1.p.rapidapi.com'
+    }
+    try:
+        url = f"/v3/{endpoint}?{params}"
+        print(f"\nAPI Request URL: {url}")
+        
+        conn.request("GET", url, headers=headers)
+        res = conn.getresponse()
+        data = res.read()
+        
+        if res.status != 200:
+            print(f"API Error Response: {res.status}")
+            return None
+            
+        response_data = json.loads(data.decode('utf-8'))
+        
+        # Mettre en cache
+        api_cache.set(cache_key, response_data)
+        
+        return response_data
+    except Exception as e:
+        print(f"API Request Error: {str(e)}")
+        return None
+    finally:
+        conn.close()
+
+@lru_cache(maxsize=32)
+def get_match_statistics(fixture_id):
+    # Cache au niveau de la fonction avec lru_cache
+    return make_api_request('fixtures/statistics', f'fixture={fixture_id}')
+
+@lru_cache(maxsize=32)
+def get_match_events(fixture_id):
+    return make_api_request('fixtures/events', f'fixture={fixture_id}')
+
+@lru_cache(maxsize=32)
+def get_match_score(fixture_id):
+    return make_api_request('fixtures', f'id={fixture_id}')
+
+@lru_cache(maxsize=32)
+def get_prediction(fixture_id):
+    prediction_data = make_api_request('predictions', f'fixture={fixture_id}')
+    if not prediction_data or 'response' not in prediction_data:
+        return None
+        
+    return process_prediction_data(prediction_data)
+
 @app.template_filter('format_time')
 def format_time(date_str):
     """Formate une date au format HH:MM"""
@@ -109,34 +192,6 @@ def format_time(date_str):
 def handle_error(e):
     print(f"Erreur: {str(e)}")
     return "Une erreur s'est produite. Veuillez réessayer plus tard.", 500
-
-def make_api_request(endpoint, params=""):
-    conn = http.client.HTTPSConnection('api-football-v1.p.rapidapi.com')
-    headers = {
-        'x-rapidapi-key': API_KEY,
-        'x-rapidapi-host': 'api-football-v1.p.rapidapi.com'
-    }
-    try:
-        url = f"/v3/{endpoint}?{params}"
-        print(f"\nAPI Request URL: {url}")  # Debug log
-        
-        conn.request("GET", url, headers=headers)
-        res = conn.getresponse()
-        data = res.read()
-        print(f"API Response Status: {res.status}")  # Debug log
-        
-        response_data = json.loads(data.decode('utf-8'))
-        if res.status != 200:
-            print(f"API Error Response: {response_data}")
-        else:
-            print(f"API Success - Number of results: {len(response_data.get('response', []))}")
-            
-        return response_data
-    except Exception as e:
-        print(f"API Request Error: {str(e)}")
-        return {"response": []}
-    finally:
-        conn.close()
 
 def safe_float(value):
     try:
@@ -222,137 +277,14 @@ def check_prediction_accuracy(match, prediction):
     print(f"Résultat de la prédiction: {'Correct' if result else 'Incorrect'}")
     return result
 
-def get_match_statistics(fixture_id):
-    """Récupère les statistiques détaillées d'un match"""
-    print(f"Récupération des statistiques pour le match {fixture_id}")
-    stats_data = make_api_request("fixtures/statistics", f"fixture={fixture_id}")
-    print("Données brutes des statistiques:", stats_data)
-    
-    if not stats_data or 'response' not in stats_data:
-        return {'home': {}, 'away': {}}
-    
-    stats = {'home': {}, 'away': {}}
-    
-    # Récupérer d'abord les IDs des équipes du match
-    match_data = make_api_request("fixtures", f"id={fixture_id}")
-    if not match_data or 'response' not in match_data or not match_data['response']:
-        return stats
-        
-    match = match_data['response'][0]
-    home_team_id = match['teams']['home']['id']
-    
-    for team_stats in stats_data['response']:
-        # Déterminer si c'est l'équipe à domicile ou à l'extérieur
-        side = 'home' if team_stats['team']['id'] == home_team_id else 'away'
-            
-        for stat in team_stats.get('statistics', []):
-            type_name = stat.get('type')
-            value = stat.get('value', 0)
-            
-            if type_name == 'Shots on Goal':
-                stats[side]['Shots on Goal'] = value if value is not None else 0
-            elif type_name == 'Total Shots':
-                stats[side]['Total Shots'] = value if value is not None else 0
-            elif type_name == 'Ball Possession':
-                if isinstance(value, str):
-                    value = value.rstrip('%')
-                try:
-                    stats[side]['Ball Possession'] = int(value) if value is not None else 0
-                except (ValueError, TypeError):
-                    stats[side]['Ball Possession'] = 0
-            elif type_name == 'Corner Kicks':
-                stats[side]['Corner Kicks'] = value if value is not None else 0
-            elif type_name == 'Fouls':
-                stats[side]['Fouls'] = value if value is not None else 0
-    
-    print("Statistiques traitées:", stats)
-    return stats
-
-def get_match_events(fixture_id):
-    """Récupère les événements d'un match (buts, cartons, etc.)"""
-    print(f"Récupération des événements pour le match {fixture_id}")
-    events_data = make_api_request("fixtures/events", f"fixture={fixture_id}")
-    print("Données brutes des événements:", events_data)
-    
-    events = {
-        'cards': {
-            'home': {'yellow': 0, 'red': 0},
-            'away': {'yellow': 0, 'red': 0}
-        },
-        'goals': {
-            'home': 0,
-            'away': 0
-        }
-    }
-    
-    if not events_data or 'response' not in events_data:
-        return events
-        
-    # Récupérer d'abord les IDs des équipes du match
-    match_data = make_api_request("fixtures", f"id={fixture_id}")
-    if not match_data or 'response' not in match_data or not match_data['response']:
-        return events
-        
-    match = match_data['response'][0]
-    home_team_id = match['teams']['home']['id']
-        
-    for event in events_data['response']:
-        team_id = event.get('team', {}).get('id')
-        if not team_id:
-            continue
-            
-        side = 'home' if team_id == home_team_id else 'away'
-        event_type = event.get('type', '').lower()
-        detail = event.get('detail', '').lower()
-        
-        if event_type == 'card':
-            if detail == 'yellow card':
-                events['cards'][side]['yellow'] += 1
-            elif detail == 'red card':
-                events['cards'][side]['red'] += 1
-        elif event_type == 'goal':
-            if detail not in ['missed penalty', 'penalty']:  # Ne pas compter les penalties manqués
-                events['goals'][side] += 1
-    
-    print("Événements traités:", events)
-    return events
-
-def get_match_score(fixture_id):
-    """Récupère le score final d'un match"""
-    print(f"Récupération du score pour le match {fixture_id}")
-    match_data = make_api_request("fixtures", f"id={fixture_id}")
-    print("Données brutes du match:", match_data)
-    
-    if match_data and 'response' in match_data and match_data['response']:
-        match = match_data['response'][0]
-        if match['fixture']['status']['short'] == 'FT':
-            score = {
-                'home': match['score']['fulltime']['home'],
-                'away': match['score']['fulltime']['away']
-            }
-            print("Score final trouvé:", score)
-            return score
-    return None
-
-def get_prediction(fixture_id):
-    url = "https://api-football-v1.p.rapidapi.com/v3/predictions"
-    querystring = {"fixture": fixture_id}
-    headers = {
-        "X-RapidAPI-Key": API_KEY,
-        "X-RapidAPI-Host": "api-football-v1.p.rapidapi.com"
-    }
-    response = requests.get(url, headers=headers, params=querystring)
-    data = response.json()
-
-    if not data or 'response' not in data or not data['response']:
-        return None
-
-    prediction_data = data['response'][0]
+def process_prediction_data(prediction_data):
+    """Traite les données de prédiction pour les rendre plus facilement utilisables"""
+    prediction = prediction_data['response'][0]
     
     # Extraire toutes les prédictions under/over
     under_over_predictions = []
-    if 'predictions' in prediction_data:
-        predictions = prediction_data['predictions']
+    if 'predictions' in prediction:
+        predictions = prediction['predictions']
         # Under/Over principal
         if 'under_over' in predictions:
             under_over = predictions['under_over']
@@ -382,15 +314,15 @@ def get_prediction(fixture_id):
     under_over_value = None
     under_over_prediction = None
     
-    if 'predictions' in prediction_data and 'under_over' in prediction_data['predictions']:
-        under_over = prediction_data['predictions']['under_over']
+    if 'predictions' in prediction and 'under_over' in prediction['predictions']:
+        under_over = prediction['predictions']['under_over']
         if under_over:
             # La valeur négative indique "under", positive indique "over"
             under_over_value = abs(float(under_over))
             under_over_prediction = 'over' if float(under_over) > 0 else 'under'
     
     # Calcul des statistiques de comparaison
-    comparison = prediction_data.get('comparison', {})
+    comparison = prediction.get('comparison', {})
     
     # Distribution de Poisson
     poisson_home = round(float(clean_numeric_string(safe_get(comparison, 'poisson_distribution', 'home'), '50')), 2)
@@ -403,9 +335,9 @@ def get_prediction(fixture_id):
     def_away = round(float(clean_numeric_string(safe_get(comparison, 'def', 'away'), '50')), 2)
     
     # Déterminer l'équipe qui est favorisée pour win_or_draw
-    winner = prediction_data['predictions'].get('winner', {})
+    winner = prediction['predictions'].get('winner', {})
     winner_name = winner.get('name') if winner else None
-    raw_win_or_draw = prediction_data['predictions'].get('win_or_draw')
+    raw_win_or_draw = prediction['predictions'].get('win_or_draw')
     print("Valeur brute win_or_draw:", raw_win_or_draw)
     print("Type de win_or_draw:", type(raw_win_or_draw))
     
@@ -430,9 +362,9 @@ def get_prediction(fixture_id):
         'win_or_draw': win_or_draw,
         'win_or_draw_team': win_or_draw_team,
         'under_over': under_over_predictions,  # Liste de toutes les prédictions under/over
-        'goals_home': prediction_data['predictions'].get('goals_home'),
-        'goals_away': prediction_data['predictions'].get('goals_away'),
-        'advice': prediction_data['predictions'].get('advice'),
+        'goals_home': prediction['predictions'].get('goals_home'),
+        'goals_away': prediction['predictions'].get('goals_away'),
+        'advice': prediction['predictions'].get('advice'),
         'comparison': {
             'att': {
                 'home': round(att_home, 2),
@@ -457,72 +389,64 @@ def get_prediction(fixture_id):
 
 @app.route('/')
 def home():
-    selected_region = request.args.get('region', 'all')
-    selected_category = request.args.get('category')
-    selected_league = request.args.get('league')
-    
-    today = datetime.now().strftime("%Y-%m-%d")
-    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
-    matches_by_league = {'Aujourd\'hui': {}, 'Demain': {}}
-
-    # Déterminer les IDs de ligue à afficher
-    if selected_league:
-        league_ids = [int(selected_league)]
-    elif selected_region != 'all' and selected_region in REGIONS:
-        if selected_category:
-            category = REGIONS[selected_region]['categories'].get(selected_category)
-            if category:
-                league_ids = [league['id'] for league in category['leagues'].values()]
-            else:
-                league_ids = []
-        else:
-            league_ids = []
-            for category in REGIONS[selected_region]['categories'].values():
-                league_ids.extend([league['id'] for league in category['leagues'].values()])
-    else:
-        league_ids = list(LEAGUES.keys())
-
-    # Récupérer les matchs d'aujourd'hui et de demain
-    for date, day_key in [(today, 'Aujourd\'hui'), (tomorrow, 'Demain')]:
-        all_matches = make_api_request("fixtures", f"date={date}")
-        if all_matches.get('response'):
-            for match in all_matches['response']:
-                league_id = match.get('league', {}).get('id')
-                if league_id in LEAGUES:
-                    league_name = LEAGUES[league_id]
-                    if league_id in league_ids:
-                        if league_name not in matches_by_league[day_key]:
-                            matches_by_league[day_key][league_name] = []
-                            
-                        # Récupérer les statistiques et événements pour les matchs terminés
-                        if match['fixture']['status']['short'] == 'FT':
-                            print(f"Match terminé trouvé: {match['teams']['home']['name']} vs {match['teams']['away']['name']}")
-                            
-                            # Récupérer le score final mis à jour
-                            final_score = get_match_score(match['fixture']['id'])
-                            if final_score:
-                                if 'score' not in match:
-                                    match['score'] = {}
-                                match['score']['fulltime'] = final_score
-                            
-                            match['statistics'] = get_match_statistics(match['fixture']['id'])
-                            match['events'] = get_match_events(match['fixture']['id'])
-                            
-                            # Vérifier la prédiction
-                            prediction_data = make_api_request("predictions", f"fixture={match['fixture']['id']}")
-                            if prediction_data and 'response' in prediction_data and prediction_data['response']:
-                                prediction = prediction_data['response'][0]
-                                match['prediction_correct'] = check_prediction_accuracy(match, prediction)
-                                print(f"Prédiction correcte: {match['prediction_correct']}")
-                            
-                        matches_by_league[day_key][league_name].append(match)
-
-    return render_template('index.html', 
-                         matches_by_league=matches_by_league, 
-                         regions=REGIONS, 
-                         selected_region=selected_region,
-                         selected_category=selected_category,
-                         selected_league=selected_league)
+    try:
+        # Récupérer la date actuelle
+        current_date = datetime.now().strftime('%Y-%m-%d')
+        
+        # Créer une clé de cache unique pour les matchs du jour
+        cache_key = f"matches_{current_date}"
+        cached_matches = api_cache.get(cache_key)
+        
+        if cached_matches:
+            return render_template('index.html', matches=cached_matches, regions=REGIONS)
+        
+        # Si pas en cache, récupérer les matchs
+        matches_data = make_api_request('fixtures', f'date={current_date}')
+        
+        if not matches_data or 'response' not in matches_data:
+            return render_template('index.html', matches=[], regions=REGIONS)
+        
+        matches = []
+        for match in matches_data['response']:
+            # Filtrer uniquement les matchs des ligues qu'on suit
+            league_id = match['league']['id']
+            if league_id not in LEAGUES:
+                continue
+                
+            # Récupérer uniquement les informations nécessaires
+            match_info = {
+                'id': match['fixture']['id'],
+                'timestamp': match['fixture']['timestamp'],
+                'date': match['fixture']['date'],
+                'league': {
+                    'id': league_id,
+                    'name': LEAGUES[league_id],
+                    'logo': match['league']['logo']
+                },
+                'teams': match['teams'],
+                'goals': match['goals'],
+                'status': match['fixture']['status']
+            }
+            
+            # Ne récupérer les prédictions que pour les matchs à venir
+            if match['fixture']['status']['short'] == 'NS':
+                prediction = get_prediction(match['fixture']['id'])
+                if prediction:
+                    match_info['prediction'] = prediction
+            
+            matches.append(match_info)
+        
+        # Trier les matchs par heure
+        matches.sort(key=lambda x: x['timestamp'])
+        
+        # Mettre en cache pour 30 minutes
+        api_cache.set(cache_key, matches)
+        
+        return render_template('index.html', matches=matches, regions=REGIONS)
+        
+    except Exception as e:
+        print(f"Erreur dans la route home: {str(e)}")
+        return render_template('index.html', matches=[], regions=REGIONS)
 
 @app.route('/search')
 def search():
