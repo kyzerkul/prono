@@ -3,22 +3,15 @@ import http.client
 import json
 from datetime import datetime, timedelta
 import requests
+import os
+from dotenv import load_dotenv
+
+load_dotenv()  # Charge les variables d'environnement depuis .env
 
 app = Flask(__name__)
-app.secret_key = 'votre_clé_secrète_ici'  # Remplacez par une vraie clé secrète
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'default-dev-key')  # Utilise la clé depuis les variables d'environnement
 
-@app.template_filter('format_time')
-def format_time(date_str):
-    """Formate une date au format HH:MM"""
-    try:
-        if isinstance(date_str, str):
-            # Si c'est une chaîne ISO, on la parse
-            dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-            return dt.strftime('%H:%M')
-        return ''
-    except Exception as e:
-        print(f"Erreur lors du formatage de la date {date_str}: {e}")
-        return ''
+API_KEY = os.environ.get('RAPIDAPI_KEY', 'dfa89bdb87mshcc417c376ac947fp100750jsn6f1aa9d00a91')
 
 # Organisation des ligues par région
 REGIONS = {
@@ -97,8 +90,6 @@ for region in REGIONS.values():
     for category in region['categories'].values():
         for league in category['leagues'].values():
             LEAGUES[league['id']] = league['name']
-
-API_KEY = 'dfa89bdb87mshcc417c376ac947fp100750jsn6f1aa9d00a91'
 
 def make_api_request(endpoint, params=""):
     conn = http.client.HTTPSConnection('api-football-v1.p.rapidapi.com')
