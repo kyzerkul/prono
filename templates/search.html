@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="text-center mb-4">Résultats de recherche pour "{{ search_term }}"</h1>
+    
+    <!-- Barre de recherche -->
+    <div class="search-container mb-4">
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <form action="{{ url_for('search') }}" method="GET" class="mb-2">
+                    <div class="input-group">
+                        <input type="text" 
+                               id="team-search" 
+                               name="q" 
+                               class="form-control" 
+                               placeholder="Rechercher une équipe..." 
+                               value="{{ search_term }}"
+                               autocomplete="off"
+                               required 
+                               minlength="3">
+                        <button type="submit" class="btn btn-primary">Rechercher</button>
+                    </div>
+                </form>
+                <div id="search-results" class="search-results" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    {% if error %}
+        <div class="alert alert-info">{{ error }}</div>
+    {% else %}
+        {% if not matches_by_date %}
+            <div class="alert alert-info">Aucun match trouvé pour "{{ search_term }}". Essayez avec un autre terme de recherche.</div>
+        {% else %}
+            {% for date, matches in matches_by_date.items() %}
+                <div class="day-section mb-4">
+                    <h2 class="mb-3">{{ date }}</h2>
+                    <div class="row">
+                        {% for match in matches %}
+                            <div class="col-md-4 mb-3">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <div class="match-teams">
+                                            <div class="team">
+                                                <img src="{{ match.teams.home.logo }}" alt="{{ match.teams.home.name }}" class="team-logo">
+                                                <span>{{ match.teams.home.name }}</span>
+                                            </div>
+                                            <small class="mx-1">VS</small>
+                                            <div class="team">
+                                                <img src="{{ match.teams.away.logo }}" alt="{{ match.teams.away.name }}" class="team-logo">
+                                                <span>{{ match.teams.away.name }}</span>
+                                            </div>
+                                        </div>
+                                        <div class="text-center">
+                                            <div class="mb-2">
+                                                <small class="text-muted">{{ match.league.name }}</small>
+                                            </div>
+                                            <small class="match-time">{{ match.fixture.date.split('T')[1][:5] }}</small>
+                                            {% if match.fixture.status.short == 'FT' %}
+                                                <div class="match-status mb-1">
+                                                    <span class="badge bg-secondary">Terminé {{ match.goals.home }}-{{ match.goals.away }}</span>
+                                                    {% if match.prediction_accuracy %}
+                                                        <span class="badge bg-success">Prédiction correcte</span>
+                                                    {% endif %}
+                                                </div>
+                                            {% endif %}
+                                            <form action="{{ url_for('get_predictions') }}" method="POST" class="mt-1">
+                                                <input type="hidden" name="fixture_id" value="{{ match.fixture.id }}">
+                                                <button type="submit" class="btn btn-primary btn-sm">Prédiction</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endif %}
+</div>
+
+<script>
+    $(document).ready(function() {
+        const searchInput = $('#team-search');
+        const searchResults = $('#search-results');
+        let searchTimeout;
+        
+        function displayResults(data) {
+            searchResults.empty();
+            if (data.length > 0) {
+                data.forEach(function(item) {
+                    const resultItem = $('<div>')
+                        .addClass('search-result-item')
+                        .html(`
+                            <div class="d-flex justify-content-between">
+                                <strong>${item.home_team} vs ${item.away_team}</strong>
+                                <small class="text-muted">${item.time}</small>
+                            </div>
+                            <div><small class="text-muted">${item.league} - ${item.date}</small></div>
+                        `);
+                    
+                    resultItem.on('click', function() {
+                        const form = $('<form>')
+                            .attr('method', 'POST')
+                            .attr('action', '/predictions')
+                            .append($('<input>')
+                                .attr('type', 'hidden')
+                                .attr('name', 'fixture_id')
+                                .val(item.value)
+                            );
+                        $('body').append(form);
+                        form.submit();
+                    });
+                    
+                    searchResults.append(resultItem);
+                });
+            } else {
+                searchResults.append('<div class="search-result-item">Aucun match trouvé</div>');
+            }
+            searchResults.show();
+        }
+        
+        searchInput.on('input', function() {
+            const term = $(this).val().trim();
+            
+            // Effacer le timeout précédent
+            if (searchTimeout) {
+                clearTimeout(searchTimeout);
+            }
+            
+            if (term.length < 3) {
+                searchResults.hide();
+                return;
+            }
+            
+            // Afficher un message de chargement
+            searchResults.html('<div class="search-result-item">Recherche en cours...</div>').show();
+            
+            // Définir un nouveau timeout pour éviter trop de requêtes
+            searchTimeout = setTimeout(function() {
+                $.getJSON('/search-teams', { term: term })
+                    .done(function(data) {
+                        displayResults(data);
+                    })
+                    .fail(function(jqXHR, textStatus, errorThrown) {
+                        searchResults.html('<div class="search-result-item text-danger">Erreur lors de la recherche</div>');
+                        console.error('Search error:', textStatus, errorThrown);
+                    });
+            }, 300);
+        });
+        
+        // Cacher les résultats quand on clique en dehors
+        $(document).on('click', function(e) {
+            if (!$(e.target).closest('.search-container').length) {
+                searchResults.hide();
+            }
+        });
+        
+        // Empêcher la soumission du formulaire quand on appuie sur Entrée
+        searchInput.on('keypress', function(e) {
+            if (e.which == 13) {
+                e.preventDefault();
+                return false;
+            }
+        });
+    });
+</script>
+{% endblock %}

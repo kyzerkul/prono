@@ -1,0 +1,651 @@
+<!-- En-tête avec gradient -->
+<div class="prediction-header text-center mb-4">
+    <h1 class="display-4 text-white mb-3">{{ match.teams.home.name }} <span class="vs-text">vs</span> {{ match.teams.away.name }}</h1>
+    <p class="lead text-white mb-4">Prédiction détaillée du match</p>
+    <a href="/" class="btn btn-light btn-lg px-4"><i class="fas fa-arrow-left me-2"></i>Retour aux matchs</a>
+</div>
+
+<!-- Prédictions -->
+<div class="card mb-4">
+    <div class="card-header gradient-header">
+        <h3 class="mb-0"><i class="fas fa-futbol"></i> Prédictions du match</h3>
+    </div>
+    <div class="card-body">
+        <div class="prediction-details">
+            <div class="row">
+                <!-- Vainqueur et Double Chance -->
+                <div class="col-md-6 mb-4">
+                    <div class="prediction-item h-100">
+                        <div class="prediction-label">
+                            <i class="fas fa-trophy me-2"></i>Vainqueur du match
+                        </div>
+                        <div class="prediction-value">
+                            {% if prediction.predictions.winner.name %}
+                                <span class="badge bg-primary">{{ prediction.predictions.winner.name }}</span>
+                                {% if prediction.predictions.winner.comment %}
+                                    <p class="text-muted mt-2">{{ prediction.predictions.winner.comment }}</p>
+                                {% endif %}
+                            {% else %}
+                                <span class="badge bg-secondary">Non disponible</span>
+                            {% endif %}
+                        </div>
+                        
+                        <hr class="my-3">
+                        
+                        <div class="prediction-label">
+                            <i class="fas fa-handshake me-2"></i>Double Chance
+                        </div>
+                        <div class="prediction-value">
+                            {% if prediction.predictions.win_or_draw_team %}
+                                <span class="badge bg-success">
+                                    Victoire {{ prediction.predictions.win_or_draw_team }} ou Nul
+                                </span>
+                                <p class="text-muted mt-2 small">
+                                    L'équipe {{ prediction.predictions.win_or_draw_team }} a de bonnes chances de ne pas perdre ce match
+                                </p>
+                            {% else %}
+                                <span class="badge bg-secondary">Non disponible</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Under/Over -->
+                <div class="col-md-6 mb-4">
+                    <div class="prediction-item h-100">
+                        <div class="prediction-label">
+                            <i class="fas fa-exchange-alt me-2"></i>Under/Over
+                        </div>
+                        <div class="prediction-value">
+                            <div class="over-under-container">
+                                {% for value in [1.5, 2.5, 3.5, 4.5] %}
+                                    <div class="over-under-item {% if prediction.predictions.under_over == value %}active{% endif %}">
+                                        <div class="over-under-value">{{ value }}</div>
+                                        {% if prediction.predictions.under_over == value %}
+                                            <div class="over-under-prediction {% if prediction.predictions.under_over_prediction == 'over' %}prediction-over{% else %}prediction-under{% endif %}">
+                                                <i class="fas {% if prediction.predictions.under_over_prediction == 'over' %}fa-arrow-up{% else %}fa-arrow-down{% endif %}"></i>
+                                                {% if prediction.predictions.under_over_prediction == 'over' %}
+                                                    Plus de
+                                                {% else %}
+                                                    Moins de
+                                                {% endif %}
+                                                {{ value }} buts
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Conseil de pari -->
+            <div class="betting-advice-container mt-4">
+                <div class="row align-items-center">
+                    <div class="col-md-7">
+                        <div class="betting-advice">
+                            <h5><i class="fas fa-info-circle"></i> Conseil de Pari</h5>
+                            <ul class="list-unstyled mb-0">
+                                {% if prediction.predictions.winner %}
+                                <li><i class="fas fa-trophy"></i> Victoire {{ prediction.predictions.winner.name }}</li>
+                                {% endif %}
+                                {% if prediction.predictions.double_chance %}
+                                <li><i class="fas fa-dice-two"></i> {{ prediction.predictions.double_chance }}</li>
+                                {% endif %}
+                                {% if prediction.predictions.goals %}
+                                <li><i class="fas fa-futbol"></i> {{ prediction.predictions.goals }}</li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="col-md-5 text-center">
+                        <div class="bet-button-wrapper">
+                            <a href="https://supertutobet.com/go/inscription-1xbet-mrgb2" target="_blank" rel="noopener noreferrer" class="btn btn-1xbet">
+                                <span class="btn-content">
+                                    <i class="fas fa-money-bill-wave"></i>
+                                    <span class="btn-text">Parier sur</span>
+                                    <span class="brand-name">1xBet</span>
+                                </span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="alert alert-info">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="fas fa-lightbulb me-2"></i>
+                            <strong>Conseil de Pari :</strong>
+                        </div>
+                        <div class="ms-4">
+                            <div class="mb-1">
+                                <i class="fas fa-trophy me-2"></i>
+                                {% if prediction.predictions.winner.name %}
+                                    Victoire {{ prediction.predictions.winner.name }}
+                                {% else %}
+                                    Vainqueur : Pas de prédiction
+                                {% endif %}
+                            </div>
+                            <div class="mb-1">
+                                <i class="fas fa-handshake me-2"></i>
+                                {% if prediction.predictions.win_or_draw_team %}
+                                    Victoire ou Nul {{ prediction.predictions.win_or_draw_team }}
+                                {% else %}
+                                    Double Chance : Pas de prédiction
+                                {% endif %}
+                            </div>
+                            <div>
+                                <i class="fas fa-futbol me-2"></i>
+                                {% if prediction.predictions.under_over %}
+                                    {% for pred in prediction.predictions.under_over %}
+                                        {% if pred.prediction == 'over' %}
+                                            Plus de {{ pred.value }} buts
+                                        {% endif %}
+                                        {% if pred.prediction == 'under' %}
+                                            Moins de {{ pred.value }} buts
+                                        {% endif %}
+                                    {% endfor %}
+                                {% else %}
+                                    Buts : Pas de prédiction
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Comparaison des équipes -->
+<div class="card mb-4">
+    <div class="card-header gradient-header">
+        <h3 class="mb-0 fs-5"><i class="fas fa-chart-bar"></i> Comparaison des équipes</h3>
+    </div>
+    <div class="card-body py-3">
+        <div class="row g-3">
+            <!-- Graphique radar -->
+            <div class="col-md-6">
+                <div class="chart-container" style="position: relative; height: 300px;">
+                    <canvas id="teamComparisonChart"></canvas>
+                </div>
+            </div>
+            
+            <!-- Graphique barres horizontales -->
+            <div class="col-md-6">
+                <div class="comparison-bars">
+                    <!-- Force -->
+                    <div class="stat-row mb-4">
+                        <div class="stat-label">STRENGTH</div>
+                        <div class="progress-container">
+                            <div class="team-labels">
+                                <span class="team-label-left">{{ prediction.strength.home }}%</span>
+                                <span class="team-label-right">{{ prediction.strength.away }}%</span>
+                            </div>
+                            <div class="double-progress">
+                                <div class="progress-left" style="width: {{ prediction.strength.home }}%"></div>
+                                <div class="progress-right" style="width: {{ prediction.strength.away }}%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Force d'attaque -->
+                    <div class="stat-row mb-4">
+                        <div class="stat-label">ATTACKING POTENTIAL</div>
+                        <div class="progress-container">
+                            <div class="team-labels">
+                                <span class="team-label-left">{{ prediction.comparison.att.home }}%</span>
+                                <span class="team-label-right">{{ prediction.comparison.att.away }}%</span>
+                            </div>
+                            <div class="double-progress">
+                                <div class="progress-left" style="width: {{ prediction.comparison.att.home }}%"></div>
+                                <div class="progress-right" style="width: {{ prediction.comparison.att.away }}%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Force défensive -->
+                    <div class="stat-row mb-4">
+                        <div class="stat-label">DEFENSIVE POTENTIAL</div>
+                        <div class="progress-container">
+                            <div class="team-labels">
+                                <span class="team-label-left">{{ prediction.comparison.def.home }}%</span>
+                                <span class="team-label-right">{{ prediction.comparison.def.away }}%</span>
+                            </div>
+                            <div class="double-progress">
+                                <div class="progress-left" style="width: {{ prediction.comparison.def.home }}%"></div>
+                                <div class="progress-right" style="width: {{ prediction.comparison.def.away }}%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Distribution de Poisson -->
+                    <div class="stat-row mb-4">
+                        <div class="stat-label">POISSON DISTRIBUTION</div>
+                        <div class="progress-container">
+                            <div class="team-labels">
+                                <span class="team-label-left">{{ prediction.poisson.home }}%</span>
+                                <span class="team-label-right">{{ prediction.poisson.away }}%</span>
+                            </div>
+                            <div class="double-progress">
+                                <div class="progress-left" style="width: {{ prediction.poisson.home }}%"></div>
+                                <div class="progress-right" style="width: {{ prediction.poisson.away }}%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- H2H Force -->
+                    <div class="stat-row mb-4">
+                        <div class="stat-label">HEAD TO HEAD STRENGTH</div>
+                        <div class="progress-container">
+                            <div class="team-labels">
+                                <span class="stat-value">{{ prediction.h2h.strength }}%</span>
+                            </div>
+                            <div class="double-progress">
+                                <div class="progress-bar bg-warning" role="progressbar" 
+                                     style="width: {{ prediction.h2h.strength }}%" 
+                                     aria-valuenow="{{ prediction.h2h.strength }}" 
+                                     aria-valuemin="0" aria-valuemax="100">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- H2H Moyenne de buts -->
+                    <div class="stat-row">
+                        <div class="stat-label">HEAD TO HEAD GOALS AVERAGE</div>
+                        <div class="progress-container">
+                            <div class="team-labels">
+                                <span class="stat-value">{{ "%.1f"|format(prediction.h2h.goals) }}</span>
+                            </div>
+                            <div class="double-progress">
+                                <div class="progress-bar bg-danger" role="progressbar" 
+                                     style="width: {{ prediction.h2h.goals * 20 }}%" 
+                                     aria-valuenow="{{ prediction.h2h.goals }}" 
+                                     aria-valuemin="0" aria-valuemax="5">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="prediction-container">
+    {% if match.prediction_correct %}
+    <div class="win-label">Gagné</div>
+    {% endif %}
+    
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Prédictions</h5>
+            
+            <!-- Winner Prediction -->
+            {% if prediction.predictions.winner %}
+            <div class="prediction-item">
+                <strong>Vainqueur du match:</strong>
+                <p>{{ prediction.predictions.winner.name }}</p>
+            </div>
+            {% endif %}
+            
+            <!-- Double Chance -->
+            {% if prediction.predictions.double_chance %}
+            <div class="prediction-item">
+                <strong>Double chance:</strong>
+                <p>{{ prediction.predictions.double_chance }}</p>
+            </div>
+            {% endif %}
+            
+            <!-- Goals -->
+            {% if prediction.predictions.goals %}
+            <div class="prediction-item">
+                <strong>Buts:</strong>
+                <p>{{ prediction.predictions.goals }}</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('teamComparisonChart').getContext('2d');
+    const homeTeam = "{{ prediction.teams.home.name }}";
+    const awayTeam = "{{ prediction.teams.away.name }}";
+    
+    new Chart(ctx, {
+        type: 'radar',
+        data: {
+            labels: ['Force', 'Attaque', 'Défense', 'Poisson', 'Victoires'],
+            datasets: [{
+                label: homeTeam,
+                data: [
+                    {{ prediction.strength.home }},
+                    {{ prediction.comparison.att.home }},
+                    {{ prediction.comparison.def.home }},
+                    {{ prediction.poisson.home }},
+                    {{ prediction.strength.home }}
+                ],
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                borderColor: 'rgb(54, 162, 235)',
+                pointBackgroundColor: 'rgb(54, 162, 235)',
+                borderWidth: 2,
+                pointRadius: 3
+            }, {
+                label: awayTeam,
+                data: [
+                    {{ prediction.strength.away }},
+                    {{ prediction.comparison.att.away }},
+                    {{ prediction.comparison.def.away }},
+                    {{ prediction.poisson.away }},
+                    {{ prediction.strength.away }}
+                ],
+                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                borderColor: 'rgb(255, 99, 132)',
+                pointBackgroundColor: 'rgb(255, 99, 132)',
+                borderWidth: 2,
+                pointRadius: 3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                r: {
+                    angleLines: {
+                        display: true,
+                        color: 'rgba(0,0,0,0.2)'
+                    },
+                    grid: {
+                        color: 'rgba(0,0,0,0.2)'
+                    },
+                    ticks: {
+                        display: true,
+                        stepSize: 20,
+                        font: {
+                            size: 10
+                        }
+                    },
+                    suggestedMin: 0,
+                    suggestedMax: 100,
+                    pointLabels: {
+                        font: {
+                            size: 12
+                        }
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        boxWidth: 15,
+                        padding: 15,
+                        font: {
+                            size: 12
+                        }
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+
+<style>
+.stat-row {
+    margin-bottom: 15px;
+}
+
+.stat-label {
+    text-align: center;
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: #666;
+    font-size: 0.9em;
+}
+
+.progress-container {
+    position: relative;
+    width: 100%;
+}
+
+.team-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 3px;
+}
+
+.team-label-left, .team-label-right {
+    font-size: 0.9em;
+    color: #666;
+}
+
+.double-progress {
+    height: 18px;
+    width: 100%;
+    background: #f0f0f0;
+    position: relative;
+    border-radius: 9px;
+    overflow: hidden;
+}
+
+.progress-left {
+    position: absolute;
+    left: 0;
+    height: 100%;
+    background: #36a2eb;
+    border-radius: 9px 0 0 9px;
+}
+
+.progress-right {
+    position: absolute;
+    right: 0;
+    height: 100%;
+    background: #4bc0c0;
+    border-radius: 0 9px 9px 0;
+}
+
+.comparison-bars {
+    padding: 15px;
+}
+
+.over-under-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    justify-content: center;
+}
+
+.over-under-item {
+    text-align: center;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    min-width: 120px;
+    opacity: 0.7;
+}
+
+.over-under-item.active {
+    border-color: #007bff;
+    opacity: 1;
+    box-shadow: 0 0 10px rgba(0,123,255,0.2);
+}
+
+.over-under-value {
+    font-size: 1.2em;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.over-under-prediction {
+    font-size: 0.9em;
+    padding: 5px 10px;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+.prediction-over {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.prediction-under {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.prediction-header {
+    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    padding: 3rem 2rem;
+    border-radius: 10px;
+    margin-bottom: 2rem;
+}
+
+.vs-text {
+    color: #ffd700;
+    font-weight: bold;
+    margin: 0 10px;
+}
+
+.gradient-header {
+    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    color: white;
+}
+
+.prediction-item {
+    background: #fff;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.prediction-label {
+    font-size: 1.1em;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 15px;
+}
+
+.prediction-value {
+    text-align: center;
+}
+
+.win-label {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background-color: #2ecc71;
+    color: #fff;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 0.9em;
+}
+
+.betting-advice-container {
+    background: linear-gradient(145deg, #ffffff, #f5f7fa);
+    border-radius: 15px;
+    padding: 25px;
+    box-shadow: 0 3px 15px rgba(0,0,0,0.08);
+    margin: 20px 0;
+    border: 1px solid rgba(0,180,219,0.1);
+}
+
+.betting-advice h5 {
+    color: #2c3e50;
+    font-weight: 600;
+    margin-bottom: 15px;
+    font-size: 1.1rem;
+}
+
+.betting-advice ul li {
+    margin-bottom: 10px;
+    color: #34495e;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+}
+
+.betting-advice ul li i {
+    margin-right: 12px;
+    color: #00b4db;
+    font-size: 1.1rem;
+    width: 20px;
+    text-align: center;
+}
+
+.bet-button-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+}
+
+.btn-1xbet {
+    background: linear-gradient(45deg, #00b4db, #0083b0);
+    color: white;
+    border: none;
+    padding: 14px 28px;
+    border-radius: 50px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0,180,219,0.25);
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-1xbet:hover {
+    background: linear-gradient(45deg, #0083b0, #00b4db);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,180,219,0.35);
+    color: white;
+}
+
+.btn-1xbet:active {
+    transform: translateY(1px);
+    box-shadow: 0 2px 10px rgba(0,180,219,0.2);
+}
+
+.btn-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.btn-text {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+.brand-name {
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+
+.btn-1xbet i {
+    font-size: 1.2rem;
+}
+
+@media (max-width: 768px) {
+    .betting-advice-container {
+        padding: 20px;
+    }
+    
+    .betting-advice {
+        margin-bottom: 20px;
+    }
+    
+    .btn-1xbet {
+        width: 100%;
+        max-width: 300px;
+    }
+}
+</style>

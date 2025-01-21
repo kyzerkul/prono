@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div class="container mt-4">
+        <h1 class="text-center mb-4">Pronostics Football</h1>
+        
+        <!-- Barre de recherche -->
+        <div class="search-container mb-4">
+            <div class="row justify-content-center">
+                <div class="col-md-6">
+                    <form action="{{ url_for('search') }}" method="GET" class="mb-2">
+                        <div class="input-group">
+                            <input type="text" 
+                                   id="team-search" 
+                                   name="q" 
+                                   class="form-control" 
+                                   placeholder="Rechercher une équipe..." 
+                                   autocomplete="off"
+                                   required 
+                                   minlength="3">
+                            <button type="submit" class="btn btn-primary">Rechercher</button>
+                        </div>
+                    </form>
+                    <div id="search-results" class="search-results" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Menu de navigation par région -->
+        <div class="region-nav mb-4">
+            <ul class="nav nav-pills justify-content-center">
+                <li class="nav-item">
+                    <a class="nav-link {% if selected_region == 'all' %}active{% endif %}" 
+                       href="{{ url_for('home', region='all') }}">
+                        Toutes les régions
+                    </a>
+                </li>
+                {% for region_code, region in regions.items() %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {% if selected_region == region_code %}active{% endif %}" 
+                           data-bs-toggle="dropdown" 
+                           href="#" 
+                           role="button" 
+                           aria-expanded="false">
+                            {{ region.name }}
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li>
+                                <a class="dropdown-item {% if selected_region == region_code and not selected_category %}active{% endif %}" 
+                                   href="{{ url_for('home', region=region_code) }}">
+                                    Toutes les ligues
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            {% for category_code, category in region.categories.items() %}
+                                <li>
+                                    <h6 class="dropdown-header">{{ category.name }}</h6>
+                                    {% for league_code, league in category.leagues.items() %}
+                                        <a class="dropdown-item ps-4" 
+                                           href="{{ url_for('home', region=region_code, category=category_code, league=league.id) }}">
+                                            {{ league.name }}
+                                        </a>
+                                    {% endfor %}
+                                </li>
+                                {% if not loop.last %}
+                                    <li><hr class="dropdown-divider"></li>
+                                {% endif %}
+                            {% endfor %}
+                        </ul>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <!-- Matchs par jour -->
+        {% for day, leagues in matches_by_league.items() %}
+            {% if leagues %}
+                <div class="day-section mb-4">
+                    <h2 class="mb-3">{{ day }}</h2>
+                    {% for league_name, matches in leagues.items() %}
+                        {% if matches %}
+                            <div class="league-section mb-4">
+                                <h3 class="h5 mb-3">{{ league_name }}</h3>
+                                <div class="row">
+                                    {% for match in matches %}
+                                        <div class="col-md-4 mb-4">
+                                            <div class="card h-100 prediction-container">
+                                                {% if match.prediction_correct %}
+                                                <div class="win-label">Gagné</div>
+                                                {% endif %}
+                                                <div class="card-body">
+                                                    <div class="match-teams">
+                                                        <div class="team">
+                                                            <img src="{{ match.teams.home.logo }}" alt="{{ match.teams.home.name }}" class="team-logo">
+                                                            <span>{{ match.teams.home.name }}</span>
+                                                        </div>
+                                                        <small class="mx-1">VS</small>
+                                                        <div class="team">
+                                                            <img src="{{ match.teams.away.logo }}" alt="{{ match.teams.away.name }}" class="team-logo">
+                                                            <span>{{ match.teams.away.name }}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="match-info text-center">
+                                                        <div class="match-time">{{ match.fixture.date|format_time }}</div>
+                                                        {% if match.fixture.status.short == 'FT' %}
+                                                            <div class="match-status mb-2">
+                                                                <span class="badge bg-secondary">
+                                                                    Terminé 
+                                                                    {% if match.score.fulltime %}
+                                                                        {{ match.score.fulltime.home }}-{{ match.score.fulltime.away }}
+                                                                    {% endif %}
+                                                                </span>
+                                                            </div>
+                                                            {% if match.statistics %}
+                                                            <div class="match-statistics mt-2">
+                                                                <button class="btn btn-outline-primary btn-sm mb-2" type="button" data-bs-toggle="collapse" data-bs-target="#stats-{{ match.fixture.id }}">
+                                                                    Voir les statistiques
+                                                                </button>
+                                                                <div class="collapse" id="stats-{{ match.fixture.id }}">
+                                                                    <div class="stats-container">
+                                                                        <table class="table table-sm">
+                                                                            <tbody>
+                                                                                <tr>
+                                                                                    <td class="text-end">{{ match.statistics.home.get('Shots on Goal', 0) }}</td>
+                                                                                    <td class="text-center small">Tirs cadrés</td>
+                                                                                    <td class="text-start">{{ match.statistics.away.get('Shots on Goal', 0) }}</td>
+                                                                                </tr>
+                                                                                <tr>
+                                                                                    <td class="text-end">{{ match.statistics.home.get('Total Shots', 0) }}</td>
+                                                                                    <td class="text-center small">Tirs totaux</td>
+                                                                                    <td class="text-start">{{ match.statistics.away.get('Total Shots', 0) }}</td>
+                                                                                </tr>
+                                                                                <tr>
+                                                                                    <td class="text-end">{{ match.statistics.home.get('Ball Possession', 0) }}%</td>
+                                                                                    <td class="text-center small">Possession</td>
+                                                                                    <td class="text-start">{{ match.statistics.away.get('Ball Possession', 0) }}%</td>
+                                                                                </tr>
+                                                                                <tr>
+                                                                                    <td class="text-end">{{ match.statistics.home.get('Corner Kicks', 0) }}</td>
+                                                                                    <td class="text-center small">Corners</td>
+                                                                                    <td class="text-start">{{ match.statistics.away.get('Corner Kicks', 0) }}</td>
+                                                                                </tr>
+                                                                                <tr>
+                                                                                    <td class="text-end">{{ match.statistics.home.get('Fouls', 0) }}</td>
+                                                                                    <td class="text-center small">Fautes</td>
+                                                                                    <td class="text-start">{{ match.statistics.away.get('Fouls', 0) }}</td>
+                                                                                </tr>
+                                                                                <tr>
+                                                                                    <td class="text-end">
+                                                                                        {% if match.events.cards.home.yellow > 0 %}
+                                                                                            <span class="badge bg-warning text-dark">{{ match.events.cards.home.yellow }}</span>
+                                                                                        {% endif %}
+                                                                                        {% if match.events.cards.home.red > 0 %}
+                                                                                            <span class="badge bg-danger">{{ match.events.cards.home.red }}</span>
+                                                                                        {% endif %}
+                                                                                    </td>
+                                                                                    <td class="text-center small">Cartons</td>
+                                                                                    <td class="text-start">
+                                                                                        {% if match.events.cards.away.yellow > 0 %}
+                                                                                            <span class="badge bg-warning text-dark">{{ match.events.cards.away.yellow }}</span>
+                                                                                        {% endif %}
+                                                                                        {% if match.events.cards.away.red > 0 %}
+                                                                                            <span class="badge bg-danger">{{ match.events.cards.away.red }}</span>
+                                                                                        {% endif %}
+                                                                                    </td>
+                                                                                </tr>
+                                                                            </tbody>
+                                                                        </table>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            {% endif %}
+                                                        {% else %}
+                                                            <div class="match-status">{{ match.fixture.status.long }}</div>
+                                                        {% endif %}
+                                                        <form action="{{ url_for('get_predictions') }}" method="POST" class="mt-1">
+                                                            <input type="hidden" name="fixture_id" value="{{ match.fixture.id }}">
+                                                            <button type="submit" class="btn btn-primary btn-sm">Prédiction</button>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endfor %}
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            const searchInput = $('#team-search');
+            const searchResults = $('#search-results');
+            let searchTimeout;
+            
+            function displayResults(data) {
+                searchResults.empty();
+                if (data.length > 0) {
+                    data.forEach(function(item) {
+                        const resultItem = $('<div>')
+                            .addClass('search-result-item')
+                            .html(`
+                                <div class="d-flex justify-content-between">
+                                    <strong>${item.home_team} vs ${item.away_team}</strong>
+                                    <small class="text-muted">${item.time}</small>
+                                </div>
+                                <div><small class="text-muted">${item.league} - ${item.date}</small></div>
+                            `);
+                        
+                        resultItem.on('click', function() {
+                            const form = $('<form>')
+                                .attr('method', 'POST')
+                                .attr('action', '/predictions')
+                                .append($('<input>')
+                                    .attr('type', 'hidden')
+                                    .attr('name', 'fixture_id')
+                                    .val(item.value)
+                                );
+                            $('body').append(form);
+                            form.submit();
+                        });
+                        
+                        searchResults.append(resultItem);
+                    });
+                } else {
+                    searchResults.append('<div class="search-result-item">Aucun match trouvé</div>');
+                }
+                searchResults.show();
+            }
+            
+            searchInput.on('input', function() {
+                const term = $(this).val().trim();
+                
+                // Effacer le timeout précédent
+                if (searchTimeout) {
+                    clearTimeout(searchTimeout);
+                }
+                
+                if (term.length < 3) {
+                    searchResults.hide();
+                    return;
+                }
+                
+                // Afficher un message de chargement
+                searchResults.html('<div class="search-result-item">Recherche en cours...</div>').show();
+                
+                // Définir un nouveau timeout pour éviter trop de requêtes
+                searchTimeout = setTimeout(function() {
+                    $.getJSON('/search-teams', { term: term })
+                        .done(function(data) {
+                            displayResults(data);
+                        })
+                        .fail(function(jqXHR, textStatus, errorThrown) {
+                            searchResults.html('<div class="search-result-item text-danger">Erreur lors de la recherche</div>');
+                            console.error('Search error:', textStatus, errorThrown);
+                        });
+                }, 300);
+            });
+            
+            // Cacher les résultats quand on clique en dehors
+            $(document).on('click', function(e) {
+                if (!$(e.target).closest('.search-container').length) {
+                    searchResults.hide();
+                }
+            });
+            
+            // Empêcher la soumission du formulaire quand on appuie sur Entrée
+            searchInput.on('keypress', function(e) {
+                if (e.which == 13) {
+                    e.preventDefault();
+                    return false;
+                }
+            });
+        });
+    </script>
+{% endblock %}
