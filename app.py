@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, render_template, request, redirect, url_for
+from flask import Flask, jsonify, render_template, request, redirect, url_for, send_from_directory
 import http.client
 import json
 from datetime import datetime, timedelta
@@ -698,6 +698,11 @@ def show_prediction(fixture_id):
         away_stats=away_stats,
         h2h=h2h.get('response', [])
     )
+
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(os.path.join(app.root_path, 'static'),
+                             'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0')
